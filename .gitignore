@@ -1,0 +1,5 @@
+backup/*
+conf/*
+data/*
+logs/*
+*.bak
