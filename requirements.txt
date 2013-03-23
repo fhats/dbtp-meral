@@ -1,2 +1,3 @@
+boto == 2.8.0
 pysqlite >= 1.0
 twisted >= 1.2

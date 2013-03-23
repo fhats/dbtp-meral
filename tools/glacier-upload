@@ -1,0 +1,119 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""glacier-upload
+
+Author: Fred Hatfull
+Date: 2013-03-20
+
+Given a file and glacier vault, uploads the file with a datetime prefix to that
+vault (useful for backups). Writes a log file that maps the archive ID to the
+uploaded description. The AWS region, stored description, and log location can
+be configured from the command line.
+
+Note: expects you to configure boto as per
+http://docs.pythonboto.org/en/latest/boto_config_tut.html. Probably using a
+config file like ~/.boto, cause I don't think anything else will work without
+changing the shebang to use env.
+
+If you're me, you probably want to throw some credentials in ~/.boto
+"""
+import datetime
+from optparse import OptionParser
+import os.path
+import sys
+
+import boto.glacier
+import boto.glacier.layer2
+
+
+class NoSuchVault(Exception):
+    def __init__(self, vault_list, *args, **kwargs):
+        """Allows us to attach a list of available vaults for useful error
+        output.
+        """
+        self.vault_list = vault_list
+        return super(NoSuchVault, self).__init__(*args, **kwargs)
+
+
+def define_options(usage):
+    parser = OptionParser(usage=usage)
+    parser.add_option('-f', '--prefix-format', default="%Y-%m-%d-%H%M%S-", help="The date prefix to prepend to the file to identify it. Should be a python datestring.")
+    parser.add_option('-l', '--log-location', default=os.path.abspath('./.glacier-upload.log'), help="Where to append upload logs to")
+    parser.add_option('-n', '--name', default=None, help="The description to store in the vault. Overrides --prefix-format")
+    parser.add_option('-r', '--region', default='us-west-2', help="The AWS region to connect to")
+    parser.add_option('-v', '--verbose', default=False, action="store_true", help="Be more verbose")
+    return parser
+
+
+def get_vault(vault_name, region):
+    """Tests to make sure the specified vault exists and then provides an
+    object representing the vault.
+
+    If the vault does not exist, raises NoSuchVault.
+    """
+    # Sets up a connection to glacier
+    glacier_connection = boto.glacier.layer2.Layer2(region_name=region)
+
+    # First, list the vaults available
+    vault_list = glacier_connection.list_vaults()
+    vault_name_list = [vault.name for vault in vault_list]
+
+    if vault_name not in vault_name_list:
+        raise NoSuchVault(vault_name_list)
+
+    for vault in vault_list:
+        if vault.name == vault_name:
+            return vault
+
+
+def _print_dym(dym_list, *lines):
+    print >>sys.stderr, "\n".join(list(lines) + map(lambda x: "".join(("\t", x)), dym_list))
+
+
+def _region_list():
+    return [region.name for region in boto.glacier.regions()]
+
+
+if __name__ == "__main__":
+    usage = "usage: glacier-upload [options] file glacier_vault"
+    parser = define_options(usage)
+    options, positional_args = parser.parse_args()
+
+    if len(positional_args) != 2:
+        print >>sys.stderr, usage
+        sys.exit(1)
+
+    source_file, glacier_vault_name = positional_args
+
+    if not (os.path.exists(source_file) and os.path.isfile(source_file)):
+        print >>sys.stderr, "Cowardly refusing to archive non-existent file %s" % source_file
+        sys.exit(1)
+
+    if options.region not in _region_list():
+        _print_dym(_region_list(),
+            "Unrecognized region %s for glacier" % options.region,
+            "Here are the regions I recognize:")
+        sys.exit(1)
+
+    try:
+        destination_vault = get_vault(glacier_vault_name, options.region)
+    except NoSuchVault as e:
+        _print_dym(
+            e.vault_list,
+            "Couldn't find vault %s in region %s!" % (glacier_vault_name, options.region),
+            "Here are the vaults I found:"
+        )
+        sys.exit(1)
+
+    source_file_name = os.path.basename(source_file)
+
+    # Figure out what to call this backup
+    format_str = "".join((options.prefix_format, source_file_name))
+    backup_description = options.name or datetime.datetime.now().strftime(format_str)
+
+    # Store the backup
+    archive_id = destination_vault.create_archive_from_file(filename=source_file, description=backup_description)
+
+    with open(options.log_location, 'a') as f:
+        f.write("\t".join((archive_id, backup_description)))
+
