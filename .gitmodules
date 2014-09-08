@@ -1,6 +1,3 @@
 [submodule "supybot"]
 	path = supybot
 	url = git://supybot.git.sourceforge.net/gitroot/supybot/supybot
-[submodule "plugins/Markov"]
-	path = plugins/Markov
-	url = http://git.jamessan.com/git/Supybot/Markov.git
