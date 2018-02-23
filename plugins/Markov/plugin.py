@@ -480,7 +480,7 @@ class Markov(callbacks.Plugin):
         to start the Markov chain.
         """
         f = self._markov(channel, irc, word1, word2,
-                         prefixNick=False, Random=False)
+                         prefixNick=False, memekov=True, Random=False)
         self.q.enqueue(f)
     memekov = wrap(memekov, ['channeldb', optional('something'),
                              additional('something')])
