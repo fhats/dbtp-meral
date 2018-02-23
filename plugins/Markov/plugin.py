@@ -432,7 +432,7 @@ class Markov(callbacks.Plugin):
                 if len(resp) >= minLength:
                     if memekov:
                         def quote(s):
-                            s = s.replace('/', '∕')  # urlme.me 404s when you put %2f in there?
+                            s = s.replace('/', '-')  # urlme.me 404s when you put %2f in there?
                             s = urllib.quote_plus(s, safe='-')
                             s = s.replace('+', '_')
                             return s
