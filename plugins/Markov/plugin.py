@@ -31,6 +31,7 @@ import time
 import Queue
 import random
 import threading
+import urllib
 
 import supybot.conf
 import supybot.utils as utils
@@ -388,7 +389,7 @@ class Markov(callbacks.Plugin):
                                isLast=(follower is None))
             self.q.enqueue(doPrivmsg)
 
-    def _markov(self, channel, irc, word1=None, word2=None, **kwargs):
+    def _markov(self, channel, irc, word1=None, word2=None, memekov=False, **kwargs):
         def f(db):
             minLength = self.registryValue('minChainLength', channel)
             maxTries = self.registryValue('maxAttempts', channel)
@@ -429,7 +430,20 @@ class Markov(callbacks.Plugin):
                         return # ditto here re: Raise
                     words.append(follower)
                 if len(resp) >= minLength:
-                    irc.reply(' '.join(resp), **kwargs)
+                    if memekov:
+                        def quote(s):
+                            s = s.replace('/', '∕')  # urlme.me 404s when you put %2f in there?
+                            s = urllib.quote_plus(s, safe='-')
+                            s = s.replace('+', '_')
+                            return s
+
+                        title = quote(resp.pop())
+                        first_half = quote(' '.join(resp[:len(resp)/2]))
+                        second_half = quote(' '.join(resp[len(resp)/2:]))
+
+                        irc.reply('http://urlme.me/%s/%s/%s.jpg' % (title, first_half, second_half), **kwargs)
+                    else:
+                        irc.reply(' '.join(resp), **kwargs)
                     return
                 else:
                     continue
@@ -456,6 +470,22 @@ class Markov(callbacks.Plugin):
         self.q.enqueue(f)
     markov = wrap(markov, ['channeldb', optional('something'),
                            additional('something')])
+
+    def memekov(self, irc, msg, args, channel, word1, word2):
+        """[<channel>] [word1 [word2]]
+
+        Returns a randomly-generated Markov Chain generated urlme.me link from
+        the data kept on <channel> (which is only necessary if not sent in the
+        channel itself).  If word1 and word2 are specified, they will be used
+        to start the Markov chain.
+        """
+        f = self._markov(channel, irc, word1, word2,
+                         prefixNick=False, Random=False)
+        self.q.enqueue(f)
+    memekov = wrap(memekov, ['channeldb', optional('something'),
+                             additional('something')])
+
+
 
     def firsts(self, irc, msg, args, channel):
         """[<channel>]
