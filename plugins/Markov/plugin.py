@@ -364,7 +364,7 @@ class Markov(callbacks.Plugin):
                 canSpeak = True
             if canSpeak and random.random() < prob:
                 f = self._markov(speakChan, irc, prefixNick=False,
-                                 to=speakChan, Random=True)
+                                 to=speakChan, memekov=True, Random=True)
                 schedule.addEvent(lambda: self.q.enqueue(f), now + delay)
                 self.lastSpoke = now + delay
             words = self.tokenize(msg)
