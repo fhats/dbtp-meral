@@ -437,7 +437,7 @@ class Markov(callbacks.Plugin):
                             s = s.replace('+', '_')
                             return s
 
-                        title = quote(resp.pop())
+                        title = quote(resp[-1])
                         first_half = quote(' '.join(resp[:len(resp)/2]))
                         second_half = quote(' '.join(resp[len(resp)/2:]))
 
